@@ -17,6 +17,7 @@ class CustomUserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         return self.create_user(email, password, **extra_fields)
+        
 
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
@@ -46,3 +47,55 @@ class User(AbstractBaseUser, PermissionsMixin):
     def update_last_action(self, timestamp):
         self.last_action_at = timestamp
         self.save()
+
+
+
+class BaseModel(models.Model):
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    updated_at = models.DateTimeField(default=timezone.now, editable=False)
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        self.updated_at = timezone.now()
+        super().save(*args, **kwargs)
+
+
+class Dialog(BaseModel):
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    vote_score = models.IntegerField(default=0)
+    owner = models.ForeignKey(User, related_name="dialogs", on_delete=models.CASCADE)
+
+
+class Vote(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    dialog = models.ForeignKey(Dialog, on_delete=models.CASCADE)
+    vote_type = models.IntegerField(choices=[(1, 'Upvote'), (-1, 'Downvote')])
+
+
+class Question(BaseModel):
+    dialog = models.ForeignKey(Dialog, on_delete=models.CASCADE)
+    content = models.CharField(max_length=255)
+    initial = models.BooleanField(default=True)
+
+
+class Answer(BaseModel):
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="answers")
+    content = models.CharField(max_length=255)
+    next_question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="previous_answers")
+    value = models.IntegerField(default=0)
+
+
+class UserAnswer(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    answer = models.ForeignKey(Answer, on_delete=models.CASCADE)
+    
+
+class UserDialogQuestion(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    dialog = models.ForeignKey(Dialog, on_delete=models.CASCADE)
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
+
+
